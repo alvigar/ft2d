@@ -256,18 +256,7 @@ for(gen in 1:nrow(biotypes_M)){
   }
 }
 
-## To this point we have the two tables of the species of RNA
-
-discapacidad <- read.delim("DI_Oct2016.csv", stringsAsFactors = FALSE, header = FALSE)$V1
-control <- read.delim("controlForSonia.tsv", stringsAsFactors = FALSE, header = FALSE)$V1
-
-A_m <- A_m[which(A_m$length > 0),]
-sumas_m <- colSums (A_m[4:17], na.rm = FALSE, dims = 1)
-A_m <- A_m[c('external_gene_name', 'length', 'biotype',names(sumas_m[which(sumas_m > 0)]))]
-
-A_M <- A_M[which(A_M$length > 0),]
-sumas_M <- colSums (A_M[4:17], na.rm = FALSE, dims = 1)
-A_M <- A_M[c('external_gene_name', 'length', 'biotype',names(sumas_M[which(sumas_M > 0)]))]
+## To this point we have the two tables of the species of RNA. Now we select the elements that have protein_coding
 
 comp_a = cbind(A_m,disease=rep(0,nrow(A_m)))
 comp_a_M = cbind(A_M,disease=rep(0,nrow(A_M)))
@@ -287,86 +276,152 @@ comp_a_M$disease[which(comp_a_M$disease == 2)] = 0
 comp_a[c(2,4:ncol(A_m))] <- scale(comp_a[c(2,4:ncol(A_m))])
 comp_a_M[c(2,4:ncol(A_M))] <- scale(comp_a_M[c(2,4:ncol(A_M))])
 
-comp_a_disease <- comp_a[which(comp_a[,'disease'] == 1),]
-comp_a_no_disease <- comp_a[which(comp_a[,'disease'] == 0),]
-set.seed(100)
+discapacidad <- read.delim("DI_Oct2016.csv", stringsAsFactors = FALSE, header = FALSE)$V1
+control <- read.delim("controlForSonia.tsv", stringsAsFactors = FALSE, header = FALSE)$V1
 
-comp_a_disease_training_rows <- sample(1:nrow(comp_a_disease), 0.7*nrow(comp_a_disease))
-comp_a_no_disease_training_rows <- sample(1:nrow(comp_a_no_disease), 0.7*nrow(comp_a_no_disease))
+protein <- subset(comp_a, biotype == 'protein_coding' )
 
-training_ones <- comp_a_disease[comp_a_disease_training_rows, ]
-training_zeros <- comp_a_no_disease[comp_a_no_disease_training_rows, ]
+protein_disease <- subset(protein, disease == 1)
 
-trainingData <- rbind(training_ones, training_zeros)
+vector <- c(protein_disease['external_gene_name'])$external_gene_name
 
-test_ones <- comp_a_disease[-comp_a_disease_training_rows, ]
-test_zeros <- comp_a_no_disease[-comp_a_no_disease_training_rows, ]
+for(i in 1:length(vector)){
+  vector[i] <- trimws(vector[i])
+}
 
-testData <- rbind(test_ones, test_zeros)
+genes_disease <- intersect(discapacidad, vector)
 
-comp_a_M_disease <- comp_a_M[which(comp_a_M[,'disease'] == 1),]
-comp_a_M_no_disease <- comp_a_M[which(comp_a_M[,'disease'] == 0),]
-set.seed(100)
+protein_M <- subset(comp_a_M, biotype == 'protein_coding' )
 
-comp_a_M_disease_training_rows <- sample(1:nrow(comp_a_M_disease), 0.7*nrow(comp_a_M_disease))
-comp_a_M_no_disease_training_rows <- sample(1:nrow(comp_a_M_no_disease), 0.7*nrow(comp_a_M_no_disease))
+protein_disease_M <- subset(protein_M, disease == 1)
 
-training_ones_M <- comp_a_M_disease[comp_a_M_disease_training_rows, ]
-training_zeros_M <- comp_a_M_no_disease[comp_a_M_no_disease_training_rows, ]
+vector_M <- c(protein_disease['external_gene_name'])$external_gene_name
 
-trainingData_M <- rbind(training_ones_M, training_zeros_M)
+for(i in 1:length(vector_M)){
+  vector_M[i] <- trimws(vector_M[i])
+}
 
-test_ones_M <- comp_a_M_disease[-comp_a_M_disease_training_rows, ]
-test_zeros_M <- comp_a_M_no_disease[-comp_a_M_no_disease_training_rows, ]
+genes_disease_M <- intersect(discapacidad, vector_M)
 
-testData_M <- rbind(test_ones_M, test_zeros_M)
+## Beyond this point start the split of genes in tissues
 
-formula <- as.formula(disease ~ length)
+A_m <- read.table("n_biotypes.txt",stringsAsFactors=FALSE)
+A_M <- read.table("n_biotypes_M.txt",stringsAsFactors=FALSE)
 
-formula <- as.formula(
-  paste(
-    paste(deparse(formula), collapse=""), 
-    paste(colnames(comp_a[4:(ncol(A)-1)]), collapse="+"),
-    sep="+"
-  )
-)
+A_m <- A_m[which(A_m$length > 0),]
+sumas_m <- colSums (A_m[4:17], na.rm = FALSE, dims = 1)
+A_m <- A_m[c('external_gene_name', 'length', 'biotype',names(sumas_m[which(sumas_m > 0)]))]
 
-logitMod <- glm(formula, data=trainingData, family=binomial(link="logit"))
+A_M <- A_M[which(A_M$length > 0),]
+sumas_M <- colSums (A_M[4:17], na.rm = FALSE, dims = 1)
+A_M <- A_M[c('external_gene_name', 'length', 'biotype',names(sumas_M[which(sumas_M > 0)]))]
 
-predicted <- plogis(predict(logitMod, testData)) 
+tejidos <- list.files(path="data/data/.")
 
-formula_M <- as.formula(disease ~ length)
+for(tej in 1:length(tejidos)){
+    
+    fichero <- paste('data/data/', tejidos[tej], sep='')
+    
+    tabla_individuos <- readRDS(fichero)
+    
+    if(ncol(tabla_individuos) > 0){
+      
+      expressed.genes = rowSums(tabla_individuos > 0.1)  > (0.2 * ncol(tabla_individuos))
+      
+      genes = tabla_individuos[expressed.genes,]
+      
+      genes <- unlist(strsplit(c(rownames(genes)), "\\."))[c(TRUE, FALSE)]
+      
+      genes <- getBM(attributes=c('ensembl_gene_id','hgnc_symbol',"external_gene_name",'chromosome_name','start_position','end_position', 'transcript_count', 'gene_biotype'), filters =c("ensembl_gene_id"), values=genes, mart = ensembl)
+      
+      A <- A_m #Con radio (-5000, +5000)
+      A <- A[which(A$length > 0),]
+      
+      for(i in 1:nrow(A)){
+        if (length(A[i, 'external_gene_name']) > 0){
+          if (trimws(A[i, 'external_gene_name']) %in% c(genes['external_gene_name'])$external_gene_name & trimws(A[i, 'external_gene_name']) %in% genes_disease){
+            genes_area_gen <- biotype[which(biotype$gene_name == trimws(A[i, 'external_gene_name'])), ]
+            for(j in 1:nrow(genes_area_gen)){
+              if (!(trimws(genes_area_gen[j, 'external_gene_name']) %in% c(genes['external_gene_name'])$external_gene_name)){
+                cantidad <- as.integer(A[i, trimws(genes_area_gen[j, 'gene_biotype'])]) - 1
+                if (length(cantidad) > 0){
+                  A[i, trimws(genes_area_gen[j, 'gene_biotype'])] <- cantidad
+                }
+                else {
+                  A[i, trimws(genes_area_gen[j, 'gene_biotype'])] <- 0
+                }
+              }
+            }
+          }
+          else{
+            A <- A[-i,]
+          }
+        }
+      }
+      
+      write.table(A, paste('biotypes_', gsub('.rds', '', tejidos[tej]), '_m.txt', sep=''), sep="\t")
+      
+      A <- A_M #Con radio (-500000, +500000)
+      A <- A[which(A$length > 0),]
+      
+      for(i in 1:nrow(A)){
+        if (length(A[i, 'external_gene_name']) > 0){
+          if (trimws(A[i, 'external_gene_name']) %in% c(genes['external_gene_name'])$external_gene_name & trimws(A[i, 'external_gene_name']) %in% genes_disease_M){
+            genes_area_gen <- biotype[which(biotype$gene_name == trimws(A[i, 'external_gene_name'])), ]
+            for(j in 1:nrow(genes_area_gen)){
+              if (!(trimws(genes_area_gen[j, 'external_gene_name']) %in% c(genes['external_gene_name'])$external_gene_name)){
+                cantidad <- as.integer(A[i, trimws(genes_area_gen[j, 'gene_biotype'])]) - 1
+                if (length(cantidad) > 0){
+                  A[i, trimws(genes_area_gen[j, 'gene_biotype'])] <- cantidad
+                }
+                else {
+                  A[i, trimws(genes_area_gen[j, 'gene_biotype'])] <- 0
+                }
+              }
+            }
+          }
+          else{
+            A <- A[-i,]
+          }
+        }
+      }
+      
+      write.table(A, paste('biotypes_', gsub('.rds', '', tejidos[tej]), '_M.txt', sep=''), sep="\t")
+    }
+}
 
-formula_M <- as.formula(
-  paste(
-    paste(deparse(formula_M), collapse=""), 
-    paste(colnames(comp_a_M[4:(ncol(A_M)-1)]), collapse="+"),
-    sep="+"
-  )
-)
+types_m <- names(A_m)[-c(1,2,3)]
+types_M <- names(A_M)[-c(1,2,3)]
 
-logitMod_M <- glm(formula_M, data=trainingData_M, family=binomial(link="logit"))
+tejidos_m = matrix ( nrow=length(tejidos), ncol=(length(types_m)+1) )
+dimnames(tejidos_m) <- list(tejidos, c("genes_count", types_m))
+tejidos_M = matrix ( nrow=length(tejidos), ncol=length(types_M)+1 )
+dimnames(tejidos_M) <- list(tejidos, c("genes_count", types_M))
 
-predicted_M <- plogis(predict(logitMod_M, testData_M)) 
+for(tej in 1:length(tejidos)){
+  
+  tejido_matrix_m <- read.table(paste('biotypes_', gsub('.rds', '', tejidos[tej]), '_m.txt', sep=''), stringsAsFactors = FALSE)
+  sumas_m <- colSums (tejido_matrix_m[4:ncol(tejido_matrix_m)], na.rm = FALSE, dims = 1)
+  tejido_matrix_M <- read.table(paste('biotypes_', gsub('.rds', '', tejidos[tej]), '_M.txt', sep=''), stringsAsFactors = FALSE)
+  sumas_M <- colSums (tejido_matrix_M[4:ncol(tejido_matrix_M)], na.rm = FALSE, dims = 1)
+  
+  tejidos_m[tejidos[tej], 'genes_count'] <- nrow(tejido_matrix_m)
+  tejidos_M[tejidos[tej], 'genes_count'] <- nrow(tejido_matrix_M)
+  
+  for(i in 1:length(types_m)){
+    tejidos_m[tejidos[tej], types_m[i]] <- unname(sumas_m[types_m[i]])
+  }
+  
+  for(i in 1:length(types_M)){
+    tejidos_M[tejidos[tej], types_M[i]] <- unname(sumas_M[types_M[i]])
+  }
+  
+}
 
+library(xtable)
 
-library(InformationValue)
-optCutOff <- optimalCutoff(testData$disease, predicted)[1] 
-optCutOff_M <- optimalCutoff(testData_M$disease, predicted_M)[1]
+print(xtable(tejidos_m, type="latex"), file="tejidos_m.tex")
+print(xtable(tejidos_M, type="latex"), file="tejidos_MM.tex")
 
-summary(logitMod)
-summary(logitMod_M)
+## To this point we have all the diferents all the RNA species splited by tissues of Project GTEx.
 
-predicted <- plogis(predict(logitMod, testData))  
-
-sensitivity(testData$disease, predicted, threshold = optCutOff)
-specificity(testData$disease, predicted, threshold = optCutOff)
-
-plotROC(testData$disease, predicted)
-
-predicted_M <- plogis(predict(logitMod_M, testData_M))  
-
-sensitivity(testData_M$disease, predicted_M, threshold = optCutOff_M)
-specificity(testData_M$disease, predicted_M, threshold = optCutOff_M)
-
-plotROC(testData_M$disease, predicted_M)
