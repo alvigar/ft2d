@@ -1,0 +1,27 @@
+#------------------------------------------------------------------------#
+
+##Author: Alfonso Vidal García
+##Co-Author: Juan Antonio Botía Blaya
+
+#------------------------------------------------------------------------#
+
+1. Get the disease gene info using file "dataEnsembl.R"
+	- List the genes in file "gtexgenesinnetworks.txt"
+	- Code returns two matrix with the number of ARN transcript for each gen in "n_biotype_mod.txt" (Radius 5000) and "n_biotype_mod_M.txt" (Radius 500000)
+
+2. To analyse the data obtained, run "objA.txt"
+	- Code loads info from "n_biotype_mod.txt" and "n_biotype_mod_M.txt"
+	- To load the disease genes and control genes change in code: "DI_Oct2016.csv" (disease genes); "controlForSonia.tsv" (control genes)
+	- Output summary of predicted variables and ROC Curve.
+	
+3. Get the disease info splited by tissues, run "dataGTExEnsembl.R"
+	- Code loads info from "n_biotype_mod.txt" and "n_biotype_mod_M.txt"
+	- To load the disease genes and control genes change in code: "DI_Oct2016.csv" (disease genes); "controlForSonia.tsv" (control genes)
+	- Code load tissues data from folder "data/data/.", where are all the tissues from Project GTEx
+	- Code return in folder biotypes_tissues as matrix as tissues, as step 1 but splited by tissues
+	
+4. To analyse the data by tissues, run "objB.txt"
+	- Code loads info from "n_biotype_mod.txt" and "n_biotype_mod_M.txt"
+	- To load the disease genes and control genes change in code: "DI_Oct2016.csv" (disease genes); "controlForSonia.tsv" (control genes) 
+	- Code returns the plots of the ROC curve for all tissues for the Radius 5000 and 500000
+	- Code returns also the p-values of variables for each tissue into "p-values-m.txt" (Raidus 5000) and "p-values-MM-txt" (Radius 500000)
